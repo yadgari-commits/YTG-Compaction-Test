@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       github_username:
-        description: 'GitHub username (no @)'
+        description: 'GitHub username'
         required: true
         default: 'yadgari-commits'
         type: string
@@ -43,21 +43,48 @@ jobs:
             echo "Attempt $i/12: HTTP $HTTP_CODE, retrying in 5s..."
             sleep 5
           done
-          echo "::error::PWA not reachable at $PWA_URL after 60s"
+          echo "::error::PWA not reachable"
           exit 1
 
-      - name: Build APK with PWABuilder CloudAPK
+      - name: Build APK
         env:
           GH_USER: ${{ inputs.github_username }}
           REPO_NAME: ${{ inputs.repo_name }}
         run: |
-          set -e
           PWA_URL="https://${GH_USER}.github.io/${REPO_NAME}"
-          echo "Building APK from: $PWA_URL"
+          echo "Building from: $PWA_URL"
 
-          PAYLOAD='{"name":"Civil Master Pro","launcherName":"YTG Compaction","packageId":"com.yadgari.ytgcompaction","host":"'${PWA_URL}'","startUrl":"/?source=pwa","themeColor":"#fbbf24","backgroundColor":"#0f172a","navigationColor":"#000000","iconUrl":"'${PWA_URL}'/icons/icon-512.png","maskableIconUrl":"'${PWA_URL}'/icons/icon-512-maskable.png","webManifestUrl":"'${PWA_URL}'/manifest.json","display":"standalone","orientation":"default","fallbackType":"customtabs","appVersion":"4.0.0","appVersionCode":40,"enableNotifications":false,"signingMode":"none","splashScreenFadeOutDuration":300,"additionalTrustedOrigins":[],"features":{"locationDelegation":{"enabled":false},"playBilling":{"enabled":false}}}'
+          PAYLOAD=$(cat <<JSONEOF
+{
+  "name": "Civil Master Pro",
+  "shortName": "Civil",
+  "launcherName": "Civil Master",
+  "packageId": "com.yadgari.civilmasterpro",
+  "host": "${PWA_URL}",
+  "startUrl": "/?source=pwa",
+  "themeColor": "#fbbf24",
+  "backgroundColor": "#0f172a",
+  "navigationColor": "#000000",
+  "iconUrl": "${PWA_URL}/icons/icon-512.png",
+  "maskableIconUrl": "${PWA_URL}/icons/icon-512-maskable.png",
+  "webManifestUrl": "${PWA_URL}/manifest.json",
+  "display": "standalone",
+  "orientation": "default",
+  "fallbackType": "customtabs",
+  "appVersion": "4.0.0",
+  "appVersionCode": 40,
+  "enableNotifications": false,
+  "signingMode": "none",
+  "splashScreenFadeOutDuration": 300
+}
+JSONEOF
+)
 
-          echo "=== Calling PWABuilder CloudAPK ==="
+          echo "=== Payload ==="
+          echo "$PAYLOAD"
+          echo "================="
+
+          echo "=== Calling CloudAPK ==="
           OUTPUT_ZIP=$(mktemp --suffix=.zip)
           HTTP_CODE=$(curl -s -o "$OUTPUT_ZIP" -w "%{http_code}" -X POST \
             "https://pwabuilder-cloudapk.azurewebsites.net/generateAppPackage" \
@@ -68,8 +95,9 @@ jobs:
           echo "Response size: $(du -h "$OUTPUT_ZIP" | cut -f1)"
 
           if [ "$HTTP_CODE" != "200" ]; then
-            echo "::error::PWABuilder CloudAPK returned HTTP $HTTP_CODE"
-            head -c 2000 "$OUTPUT_ZIP"
+            echo "::error::HTTP $HTTP_CODE"
+            echo "Response body:"
+            cat "$OUTPUT_ZIP"
             exit 1
           fi
 
@@ -77,7 +105,7 @@ jobs:
           echo "File type: $FILE_TYPE"
 
           if [[ "$FILE_TYPE" != *"Zip archive"* ]] && [[ "$FILE_TYPE" != *"zip"* ]] && [[ "$FILE_TYPE" != *"ASCII"* ]]; then
-            echo "::error::Response is not a zip file"
+            echo "::error::Response is not a zip"
             head -c 2000 "$OUTPUT_ZIP"
             exit 1
           fi
@@ -89,15 +117,15 @@ jobs:
           find ./extracted -name "*.apk" -exec cp {} civil-master-pro.apk \;
 
           if [ ! -f "civil-master-pro.apk" ] || [ ! -s "civil-master-pro.apk" ]; then
-            echo "::error::No APK found"
+            echo "::error::No APK in zip"
             find ./extracted -type f
             exit 1
           fi
 
-          echo "APK ready: $(du -h civil-master-pro.apk | cut -f1)"
+          echo "APK size: $(du -h civil-master-pro.apk | cut -f1)"
           ls -la *.apk
 
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: civil-master-pro-apk
@@ -112,7 +140,6 @@ jobs:
           {
             echo "## APK Build Successful!"
             echo ""
-            echo "**APK files:**"
             for f in *.apk; do
               [ -f "$f" ] && echo "- $f ($(du -h "$f" | cut -f1))"
             done
