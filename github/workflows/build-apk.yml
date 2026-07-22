@@ -54,6 +54,7 @@ jobs:
           PWA_URL="https://${GH_USER}.github.io/${REPO_NAME}"
           echo "Building from: $PWA_URL"
 
+          # Minimal payload - only required fields
           PAYLOAD=$(cat <<JSONEOF
 {
   "name": "Civil Master Pro",
