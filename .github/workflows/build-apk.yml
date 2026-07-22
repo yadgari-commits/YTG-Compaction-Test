@@ -21,41 +21,41 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - name: 📥 Checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: 🔧 Install unzip
+      - name: Install unzip
         run: sudo apt-get install -y unzip
 
-      - name: 🔍 Wait for PWA to be live
+      - name: Wait for PWA to be live
         env:
           GH_USER: ${{ inputs.github_username }}
           REPO_NAME: ${{ inputs.repo_name }}
         run: |
           PWA_URL="https://${GH_USER}.github.io/${REPO_NAME}"
-          echo "🌐 PWA URL: $PWA_URL"
+          echo "PWA URL: $PWA_URL"
           for i in {1..12}; do
             HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$PWA_URL/index.html" || echo "000")
             if [ "$HTTP_CODE" = "200" ]; then
-              echo "✅ PWA is live (attempt $i, HTTP 200)"
+              echo "PWA is live"
               exit 0
             fi
-            echo "⏔ Attempt $i/12: HTTP $HTTP_CODE, retrying in 5s..."
+            echo "Attempt $i/12: HTTP $HTTP_CODE, retrying in 5s..."
             sleep 5
           done
           echo "::error::PWA not reachable at $PWA_URL after 60s"
           exit 1
 
-      - name: 🏗️ Build APK with PWABuilder CloudAPK
+      - name: Build APK with PWABuilder CloudAPK
         env:
           GH_USER: ${{ inputs.github_username }}
           REPO_NAME: ${{ inputs.repo_name }}
         run: |
           set -e
           PWA_URL="https://${GH_USER}.github.io/${REPO_NAME}"
-          echo "🌐 Building APK from: $PWA_URL"
+          echo "Building APK from: $PWA_URL"
 
-          PAYLOAD="{\"name\":\"Civil Master Pro\",\"launcherName\":\"YTG Compaction\",\"packageId":"com.yadgari.ytgcompaction",\"host\":\"${PWA_URL}\",\"startUrl\":\"/?source=pwa\",\"themeColor\":\"#fbbf24\",\"backgroundColor\":\"#0f172a\",\"navigationColor\":\"#000000\",\"iconUrl\":\"${PWA_URL}/icons/icon-512.png\",\"maskableIconUrl\":\"${PWA_URL}/icons/icon-512-maskable.png\",\"webManifestUrl\":\"${PWA_URL}/manifest.json\",\"display\":\"standalone\",\"orientation\":\"default\",\"fallbackType\":\"customtabs\",\"appVersion\":\"4.0.0\",\"appVersionCode\":40,\"enableNotifications\":false,\"signingMode\":\"none\",\"splashScreenFadeOutDuration\":300,\"additionalTrustedOrigins\":[],\"features\":{\"locationDelegation\":{\"enabled\":false},\"playBilling\":{\"enabled\":false}}}"
+          PAYLOAD='{"name":"Civil Master Pro","launcherName":"YTG Compaction","packageId":"com.yadgari.ytgcompaction","host":"'${PWA_URL}'","startUrl":"/?source=pwa","themeColor":"#fbbf24","backgroundColor":"#0f172a","navigationColor":"#000000","iconUrl":"'${PWA_URL}'/icons/icon-512.png","maskableIconUrl":"'${PWA_URL}'/icons/icon-512-maskable.png","webManifestUrl":"'${PWA_URL}'/manifest.json","display":"standalone","orientation":"default","fallbackType":"customtabs","appVersion":"4.0.0","appVersionCode":40,"enableNotifications":false,"signingMode":"none","splashScreenFadeOutDuration":300,"additionalTrustedOrigins":[],"features":{"locationDelegation":{"enabled":false},"playBilling":{"enabled":false}}}'
 
           echo "=== Calling PWABuilder CloudAPK ==="
           OUTPUT_ZIP=$(mktemp --suffix=.zip)
@@ -94,10 +94,10 @@ jobs:
             exit 1
           fi
 
-          echo "✅ APK ready: $(du -h civil-master-pro.apk | cut -f1)"
+          echo "APK ready: $(du -h civil-master-pro.apk | cut -f1)"
           ls -la *.apk
 
-      - name: 📤 Upload APK artifact
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: civil-master-pro-apk
@@ -106,14 +106,14 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: ✅ Build summary
+      - name: Build summary
         if: success()
         run: |
           {
-            echo "## 🎉 APK Build Successful!"
+            echo "## APK Build Successful!"
             echo ""
             echo "**APK files:**"
             for f in *.apk; do
-              [ -f "$f" ] && echo "- \`$f\` ($(du -h "$f" | cut -f1))"
+              [ -f "$f" ] && echo "- $f ($(du -h "$f" | cut -f1))"
             done
           } >> $GITHUB_STEP_SUMMARY
